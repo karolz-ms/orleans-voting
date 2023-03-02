@@ -1,15 +1,17 @@
 using Voting.Data;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Host.UseOrleans((ctx, orleansBuilder) =>
+builder.Host.UseOrleans((ctx, builder) =>
 {
     if (ctx.HostingEnvironment.IsDevelopment())
     {
         // During development time, we don't want to have to deal with
         // storage emulators or other dependencies. Just "Hit F5" to run.
-        orleansBuilder
-            .UseLocalhostClustering()
-            .AddMemoryGrainStorage("votes");
+        builder.UseLocalhostClustering();
+        builder.AddMemoryGrainStorage("votes");
+        builder.UseDashboard(options => {
+            options.Port = 8888;
+        });
     }
     else
     {
