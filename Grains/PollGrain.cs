@@ -1,5 +1,6 @@
 using Grains;
 using Orleans.Runtime;
+using Orleans.Utilities;
 using VotingContract;
 
 namespace VotingData;
@@ -7,10 +8,15 @@ namespace VotingData;
 public class PollGrain : Grain, IPollGrain
 {
     private readonly IPersistentState<PollState> _votes;
+    private readonly ObserverManager<IPollWatcher> _pollWatchers;
 
     public PollGrain(
-        [PersistentState(stateName: "pollState", storageName: "votes")]
-        IPersistentState<PollState> state) => _votes = state;
+        [PersistentState(stateName: "pollState", storageName: "votes")] IPersistentState<PollState> state,
+        ILogger<PollGrain> logger
+    ) {
+        _votes = state;
+        _pollWatchers = new(TimeSpan.FromMinutes(1), logger);
+    }
 
     public Task<PollState> GetCurrentResults() => Task.FromResult(_votes.State);
 
@@ -40,11 +46,10 @@ public class PollGrain : Grain, IPollGrain
         return _votes.State;
     }
 
-    private readonly ObserverManager<IPollWatcher> _pollWatchers = new(TimeSpan.FromMinutes(1));
 
     public Task StartWatching(IPollWatcher watcher)
     {
-        _pollWatchers.Subscribe(watcher);
+        _pollWatchers.Subscribe(this, watcher);
         return Task.CompletedTask;
     }
 
