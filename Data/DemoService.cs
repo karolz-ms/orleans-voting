@@ -6,15 +6,19 @@ public partial class DemoService
 {
     private readonly IGrainFactory _grainFactory;
     private readonly ILogger<DemoService> _logger;
+    private readonly IHostApplicationLifetime _hostLifetime;
 
-    public DemoService(IGrainFactory grainFactory, ILogger<DemoService> logger)
+    public DemoService(IGrainFactory grainFactory, ILogger<DemoService> logger, IHostApplicationLifetime hostLifetime)
     {
         _grainFactory = grainFactory;
         _logger = logger;
+        _hostLifetime = hostLifetime;
     }
 
     public async Task SimulateVoters(string pollId, int numVotes)
     {
+        _hostLifetime.ApplicationStopping.ThrowIfCancellationRequested();
+
         try
         {
             var pollGrain = _grainFactory.GetGrain<IPollGrain>(pollId);
@@ -27,9 +31,10 @@ public partial class DemoService
 
                 // Wait some time.
                 await Task.Delay(random.Next(100, 1000));
+                _hostLifetime.ApplicationStopping.ThrowIfCancellationRequested();
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogError(ex, "Error while simulating voters");
         }

@@ -29,7 +29,7 @@ builder.Host.UseOrleans((ctx, builder) =>
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddScoped<PollService>();
-builder.Services.AddScoped<DemoService>();
+builder.Services.AddSingleton<DemoService>();
 
 var app = builder.Build();
 
