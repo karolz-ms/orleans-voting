@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Voting.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,4 +48,20 @@ app.UseStaticFiles();
 app.UseRouting();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
+
+app.Map("/longop/{value}", async Task<Results<StatusCodeHttpResult, Ok<String>>> (int value, CancellationToken ct, [FromServices] IHostApplicationLifetime hostLifetime) =>
+{
+    var effectiveCt = CancellationTokenSource.CreateLinkedTokenSource(ct, hostLifetime.ApplicationStopping).Token;
+
+    try
+    {
+    await Task.Delay(value * 1000, effectiveCt);
+    } catch (OperationCanceledException)
+    {
+        return TypedResults.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+    
+    return TypedResults.Ok($"Worked {value} seconds, looks good");
+});
+
 app.Run();
