@@ -67,4 +67,8 @@ app.Map("/longop/{value}", async Task<Results<StatusCodeHttpResult, Ok<String>>>
     return TypedResults.Ok($"Worked {value} seconds, looks good");
 });
 
+app.Map("/shortop", Ok<String> () => {
+    return TypedResults.Ok("Short, but sweeet success");
+});
+
 app.Run();
