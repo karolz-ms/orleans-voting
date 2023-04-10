@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Voting.Data;
 using Voting.Helpers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Reflection.Metadata.Ecma335;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Host.UseOrleans((ctx, builder) =>
@@ -30,11 +31,14 @@ builder.Host.UseOrleans((ctx, builder) =>
 });
 
 // Add services to the container.
+builder.Services.AddSingleton<IHostLifetime>(sp => new DelayedShutdownHostLifetime(
+    sp.GetRequiredService<IHostApplicationLifetime>(), 
+    TimeSpan.FromSeconds(5)
+));
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddScoped<PollService>();
 builder.Services.AddSingleton<DemoService>();
-builder.Services.AddSingleton<ApplicationStoppingTokenSource>();
 
 var app = builder.Build();
 
@@ -52,9 +56,9 @@ app.UseRouting();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
 
-app.Map("/longop/{value}", async Task<Results<StatusCodeHttpResult, Ok<String>>> (int value, CancellationToken ct, [FromServices] ApplicationStoppingTokenSource appStoppingTS) =>
+app.Map("/longop/{value}", async Task<Results<StatusCodeHttpResult, Ok<String>>> (int value, CancellationToken ct, [FromServices] IHostApplicationLifetime appLifetime) =>
 {
-    var effectiveCt = CancellationTokenSource.CreateLinkedTokenSource(ct, appStoppingTS.Token).Token;
+    var effectiveCt = CancellationTokenSource.CreateLinkedTokenSource(ct, appLifetime.ApplicationStopping).Token;
 
     try
     {
