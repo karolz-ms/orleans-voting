@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿#nullable enable
+using System.Runtime.InteropServices;
 
 namespace Voting.Helpers;
 
@@ -6,7 +7,7 @@ public class DelayedShutdownHostLifetime : IHostLifetime, IDisposable
 {
     private IHostApplicationLifetime _applicationLifetime;
     private TimeSpan _delay;
-    private IEnumerable<IDisposable> _disposables;
+    private IEnumerable<IDisposable>? _disposables;
 
     public DelayedShutdownHostLifetime(IHostApplicationLifetime applicationLifetime, TimeSpan delay) { 
         _applicationLifetime = applicationLifetime;
@@ -20,26 +21,26 @@ public class DelayedShutdownHostLifetime : IHostLifetime, IDisposable
 
     public Task WaitForStartAsync(CancellationToken cancellationToken)
     {
-        Action<PosixSignalContext> handler = HandleSignal;
-        var da = new IDisposable[3];
-        da[0] = PosixSignalRegistration.Create(PosixSignal.SIGINT, handler);
-        da[1] = PosixSignalRegistration.Create(PosixSignal.SIGQUIT, handler);
-        da[2] = PosixSignalRegistration.Create(PosixSignal.SIGTERM, handler);
-        _disposables = da;
+        _disposables = new IDisposable[]
+        {
+            PosixSignalRegistration.Create(PosixSignal.SIGINT, HandleSignal),
+            PosixSignalRegistration.Create(PosixSignal.SIGQUIT, HandleSignal),
+            PosixSignalRegistration.Create(PosixSignal.SIGTERM, HandleSignal)
+        };
         return Task.CompletedTask;
     }
 
     protected void HandleSignal(PosixSignalContext ctx)
     {
         ctx.Cancel = true;
-        Task.Delay(_delay).ContinueWith(t => { _applicationLifetime.StopApplication(); });
+        Task.Delay(_delay).ContinueWith(t =>  _applicationLifetime.StopApplication());
     }
 
     public void Dispose()
     {
-        if (_disposables != null)
-        {
-            foreach (var disposable in _disposables) { disposable.Dispose(); }
+        foreach (var disposable in _disposables ?? Enumerable.Empty<IDisposable>()) 
+        { 
+            disposable.Dispose(); 
         }
     }
 }

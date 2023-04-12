@@ -4,8 +4,12 @@ using Voting.Data;
 using Voting.Helpers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Reflection.Metadata.Ecma335;
+using System.Numerics;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.ConfigureHostOptions(opts => opts.ShutdownTimeout = TimeSpan.FromSeconds(5));
+
 builder.Host.UseOrleans((ctx, builder) =>
 {
     if (ctx.HostingEnvironment.IsDevelopment())
@@ -31,10 +35,10 @@ builder.Host.UseOrleans((ctx, builder) =>
 });
 
 // Add services to the container.
-builder.Services.AddSingleton<IHostLifetime>(sp => new DelayedShutdownHostLifetime(
-    sp.GetRequiredService<IHostApplicationLifetime>(), 
-    TimeSpan.FromSeconds(5)
-));
+//builder.Services.AddSingleton<IHostLifetime>(sp => new DelayedShutdownHostLifetime(
+//    sp.GetRequiredService<IHostApplicationLifetime>(), 
+//    TimeSpan.FromSeconds(5)
+//));
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddScoped<PollService>();
@@ -58,7 +62,8 @@ app.MapFallbackToPage("/_Host");
 
 app.Map("/longop/{value}", async Task<Results<StatusCodeHttpResult, Ok<String>>> (int value, CancellationToken ct, [FromServices] IHostApplicationLifetime appLifetime) =>
 {
-    var effectiveCt = CancellationTokenSource.CreateLinkedTokenSource(ct, appLifetime.ApplicationStopping).Token;
+    var effectiveCt = ct;
+    // var effectiveCt = CancellationTokenSource.CreateLinkedTokenSource(ct, appLifetime.ApplicationStopping).Token;
 
     try
     {
@@ -69,6 +74,40 @@ app.Map("/longop/{value}", async Task<Results<StatusCodeHttpResult, Ok<String>>>
     }
     
     return TypedResults.Ok($"Worked {value} seconds, looks good");
+});
+
+app.Map("/longop2/{value}", Results<StatusCodeHttpResult, Ok<String>> (int value, CancellationToken ct, [FromServices] IHostApplicationLifetime appLifetime) =>
+{
+    var effectiveCt = ct;
+    // var effectiveCt = CancellationTokenSource.CreateLinkedTokenSource(ct, appLifetime.ApplicationStopping).Token;
+    DateTimeOffset deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(value);
+    var rng = new Random();
+    byte[] bytes = new byte[4];
+    rng.NextBytes(bytes);
+    var v = new BigInteger(bytes);
+
+    try
+    {
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            for (int i = 0; i < 10_000; i++)
+            {
+                if (i % 2 == 0)
+                {
+                    v /= 2;
+                } else
+                {
+                    v = v * 3 + 1;
+                }
+            }
+        }
+    }
+    catch (OperationCanceledException)
+    {
+        return TypedResults.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    return TypedResults.Ok($"Worked {value} seconds, final value is {v}");
 });
 
 app.Map("/shortop", Ok<String> () => {
